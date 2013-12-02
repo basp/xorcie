@@ -1,3 +1,3 @@
 Xorcie (szorzeeyeah)
 ===
-Tis a scanner. Written for and in Go.
+Tis a scanner. It scans MOO code. It's written in Go.
