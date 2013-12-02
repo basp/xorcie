@@ -128,18 +128,24 @@ func (s *Scanner) scanKeyword() (ok bool) {
 func (s *Scanner) scanLit() (tok Token) {
     tok = ILLEGAL
     switch {
-    case s.scanStr():
-        tok = STRING
-    case s.scanIdent():
-        tok = IDENT
-    case s.scanFloat():
-        tok = FLOAT
-    case s.scanInt():
-        tok = INT
-    case s.scanObj():
-        tok = OBJ
     case s.scanOp():
         tok = OPERATOR
+        break
+    case s.scanStr():
+        tok = STRING
+        break
+    case s.scanIdent():
+        tok = IDENT
+        break
+    case s.scanFloat():
+        tok = FLOAT
+        break
+    case s.scanInt():
+        tok = INT
+        break
+    case s.scanObj():
+        tok = OBJ
+        break
     }
     return
 }
