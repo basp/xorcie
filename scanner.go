@@ -7,16 +7,18 @@ import (
 type Token int 
 
 const (
-    EOF Token = -(iota + 1)
+    EOF Token = -iota
     ILLEGAL
     IDENT
     STRING
     INT
     OBJ
     FLOAT
-    OPERATOR
+    LPAREN
+    RPAREN
     LBRACK
     RBRACK
+    OPERATOR
     KEYWORD
 )
 
@@ -30,6 +32,20 @@ var keyword = map[string]bool {
     "return": true,
 }
 
+var operator = map[string]bool {
+    "+": true,
+    "-": true,
+    "*": true,
+    "/": true,
+    "%": true,
+    "..": true,
+    "==": true,
+    "=": true,
+    "<": true,
+    ">": true,
+    // etc...
+}
+
 type Scanner struct {
     b []byte
     pos int
@@ -40,11 +56,19 @@ func NewScanner(b []byte) *Scanner {
     return &Scanner{b, 0, ""}
 }
 
+func (s *Scanner) Peek() int {
+    if s.pos < len(s.b) {
+        return int(s.b[s.pos])
+    }
+    return int(EOF)
+}
+
 var reInt = regexp.MustCompile(`^[0-9]+`)
 var reFloat = regexp.MustCompile(`^[0-9]+\.[0-9]+`)
 var reStr = regexp.MustCompile(`^".*"`)
 var reObj = regexp.MustCompile(`^#[0-9\-]+`)
 var reIdent = regexp.MustCompile(`^[a-zA-Z_]+[a-zA-Z0-9_]*`)
+var reOp = regexp.MustCompile(`^[\$\^\.\|\?\*\+!%<>=]`)
 var reWs = regexp.MustCompile(`^[\n\t\r ]+`)
 
 func (s *Scanner) scanRegexp(re *regexp.Regexp) (ok bool) {
@@ -73,6 +97,10 @@ func (s *Scanner) scanObj() (ok bool) {
     return s.scanRegexp(reObj)
 }
 
+func (s *Scanner) scanOp() (ok bool) {
+    return s.scanRegexp(reOp)
+}
+
 func (s *Scanner) scanWs() (ok bool) {
     return s.scanRegexp(reWs)
 }
@@ -97,7 +125,7 @@ func (s *Scanner) scanKeyword() (ok bool) {
     return
 }
 
-func (s *Scanner) ScanLiteral() (tok Token) {
+func (s *Scanner) scanLit() (tok Token) {
     tok = ILLEGAL
     switch {
     case s.scanStr():
@@ -110,6 +138,25 @@ func (s *Scanner) ScanLiteral() (tok Token) {
         tok = INT
     case s.scanObj():
         tok = OBJ
+    case s.scanOp():
+        tok = OPERATOR
     }
+    return
+}
+
+func (s *Scanner) Next() int {
+    if s.pos < len(s.b) {
+        r := s.b[s.pos]
+        s.pos += 1
+        return int(r)        
+    }
+    return int(EOF)
+}
+
+func (s *Scanner) Scan() (tok Token) {
+    tok = s.scanLit()
+    // We just bluntly run by any 
+    // whitespace we encounter
+    s.scanWs()
     return
 }
