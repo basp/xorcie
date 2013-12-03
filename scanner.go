@@ -52,6 +52,9 @@ var tokens = map[Token]string {
     IDENT: "IDENT",
     INT: "INT",
     STRING: "STRING",
+    FLOAT: "FLOAT",
+    ADD: "ADD",
+    SUB: "SUB",
     MUL: "MUL",
     DIV: "DIV",
     MOD: "MOD",
@@ -60,6 +63,32 @@ var tokens = map[Token]string {
     LBRACK: "LBRACK",
     RBRACK: "RBRACK",
     RANGE: "RANGE",
+    COLON: "COLON",
+    SEMICOLON: "SEMICOLON",
+    PERIOD: ".",
+    COMMA: ",",
+}
+
+const (
+    LowestPrec = 0
+    UnaryPrec = 6
+    HighestPrec = 7
+)
+
+func (t Token) Precedence() int {
+    switch t {
+    case OR:
+        return 1
+    case AND:
+        return 2
+    case EQ, NE, LT, LE, GT, GE:
+        return 3
+    case ADD, SUB:
+        return 4
+    case MUL, DIV, MOD:
+        return 5
+    }
+    return LowestPrec
 }
 
 func (t Token) String() string {
@@ -116,10 +145,11 @@ type Scanner struct {
     b []byte
     pos int
     tt string
+    advance bool
 }
 
 func NewScanner(b []byte) *Scanner {
-    return &Scanner{b, 0, ""}
+    return &Scanner{b, 0, "", false}
 }
 
 func (s *Scanner) Peek() int {
@@ -134,7 +164,7 @@ var reFloat = regexp.MustCompile(`^[0-9]+\.[0-9]+`)
 var reStr = regexp.MustCompile(`^".*"`)
 var reObj = regexp.MustCompile(`^#[0-9\-]+`)
 var reIdent = regexp.MustCompile(`^[a-zA-Z_]+[a-zA-Z0-9_]*`)
-var reOp = regexp.MustCompile(`^[\^\.\|\?\*\+!%<>=&]+`)
+var reOp = regexp.MustCompile(`^[\^\.\|\?\*\+\-!%<>=&/]+`)
 var reSym = regexp.MustCompile(`^[\{\[\(\}\]\)\$\.@,;:]`)
 var reWs = regexp.MustCompile(`^[\n\t\r ]+`)
 
@@ -143,7 +173,7 @@ func (s *Scanner) scanRegexp(re *regexp.Regexp) (ok bool) {
     if loc := re.FindIndex(t); len(loc) == 2 {
         ok = true
         s.tt = string(t[loc[0]:loc[1]])
-        s.pos += len(s.tt)
+        // s.pos += len(s.tt)
     }
     return
 }
@@ -171,18 +201,18 @@ func (s *Scanner) scanWs() (ok bool) {
 func (s *Scanner) scanIdent() (ok bool) {
     if ok = s.scanRegexp(reIdent); ok {
         ok = !keyword[s.tt]
-        if !ok {
-            s.pos -= len(s.tt)
-        }
+        //if !ok {
+            // s.pos -= len(s.tt)
+        //}
     }
     return
 }
 
 func (s *Scanner) scanKeyword() (ok bool) {
     if ok = s.scanIdent(); !ok {
-        ok = keyword[s.tt]
+        s.advance = keyword[s.tt]
         if ok {
-            s.pos += len(s.tt)
+            // s.pos += len(s.tt)
         }
     }
     return
@@ -191,10 +221,11 @@ func (s *Scanner) scanKeyword() (ok bool) {
 func (s *Scanner) scanOp() (tok Token) {
     tok = ILLEGAL
     if ok := s.scanRegexp(reOp); ok {
-        if tok, ok = operator[s.tt]; !ok {
+        tok, ok = operator[s.tt]
+        if !ok {
             tok = ILLEGAL
-            s.pos -= len(s.tt)
         }
+        s.advance = ok
     }
     return
 }
@@ -203,18 +234,23 @@ func (s *Scanner) scanLit() (tok Token) {
     tok = ILLEGAL
     switch {
     case s.scanStr():
+        s.advance = true
         tok = STRING
         break
     case s.scanIdent():
+        s.advance = true
         tok = IDENT
         break
     case s.scanFloat():
+        s.advance = true
         tok = FLOAT
         break
     case s.scanInt():
+        s.advance = true
         tok = INT
         break
     case s.scanObj():
+        s.advance = true
         tok = OBJ
         break
     }
@@ -224,12 +260,17 @@ func (s *Scanner) scanLit() (tok Token) {
 func (s *Scanner) scanSym() (tok Token) {
     tok = ILLEGAL
     if ok := s.scanRegexp(reSym); ok {
-        if tok, ok = symbol[s.tt]; ok {
-            return tok
-        }
-        s.pos -= len(s.tt)
+        tok, s.advance = symbol[s.tt]
+        //if tok, ok = symbol[s.tt]; ok {
+          //  return tok
+        //}
+        // s.pos -= len(s.tt)
     }
     return
+}
+
+func (s *Scanner) Seek(pos int) {
+    s.pos = pos
 }
 
 func (s *Scanner) Next() int {
@@ -241,16 +282,31 @@ func (s *Scanner) Next() int {
     return int(EOF)
 }
 
-func (s *Scanner) Scan() (tok Token) {
-    s.scanWs()
-    if s.pos >= len(s.b) {
-        return EOF
-    }
+func (s *Scanner) tryAdvance() (tok Token) {
     tok = ILLEGAL
+    if s.advance {
+        s.pos += len(s.tt)
+        s.advance = false
+    }    
+    if s.scanWs() {
+        s.pos += len(s.tt)
+    }
+    if s.pos >= len(s.b) {
+        tok = EOF
+    }
+    return
+}
+
+func (s *Scanner) Scan() (tok Token) {
+    tok = s.tryAdvance()
     if tok = s.scanLit(); tok != ILLEGAL {
         return
     }
     if tok = s.scanOp(); tok != ILLEGAL {
+        return
+    }
+    if s.scanKeyword() {
+        tok = KEYWORD
         return
     }
     tok = s.scanSym()
