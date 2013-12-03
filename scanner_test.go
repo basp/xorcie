@@ -48,7 +48,7 @@ func TestSimpleScan(t *testing.T) {
     }
 }
 
-func TestScanOperator(t *testing.T) {
+func TestScanVarious(t *testing.T) {
     input := "foo * 123.45"
     s := NewScanner([]byte(input))
     var tok Token
@@ -57,11 +57,30 @@ func TestScanOperator(t *testing.T) {
         t.Error("Expected IDENT but got", tok)
     }
     tok = s.Scan()
-    if tok != OPERATOR {
-        t.Error("Expected OPERATOR but got", tok)
+    if tok != MUL {
+        t.Error("Expected MUL but got", tok)
     }
     tok = s.Scan()
     if tok != FLOAT {
         t.Error("Expected FLOAT but got", tok)
+    }
+}
+
+var symScanCases = []simpleScanCase {
+    simpleScanCase{"{", LBRACE},
+    simpleScanCase{"]", RBRACK},
+    simpleScanCase{"(", LPAREN},
+    simpleScanCase{";", SEMICOLON},
+    simpleScanCase{",", COMMA},
+    simpleScanCase{".", PERIOD},
+}
+
+func TestScanSymbol(t *testing.T) {
+    for _, c := range symScanCases {
+        s := NewScanner([]byte(c.input))
+        actual := s.Scan()
+        if actual != c.expected {
+            t.Error("Expected", c.expected, "but got", actual)
+        }   
     }
 }

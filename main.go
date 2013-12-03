@@ -4,8 +4,20 @@ import (
     "log"
 )
 
+type (
+    Expr interface {
+
+    }
+
+    
+)
+
 func main() {
-    input := "fubar"
+    input := "foo[1..3] % (3 * \"foo\")"
     s := NewScanner([]byte(input))
-    log.Println(string(s.Peek()))
+    tok := s.Scan()
+    for tok != EOF {
+        log.Printf("[%v] %v", s.tt, tok)
+        tok = s.Scan()
+    }
 }

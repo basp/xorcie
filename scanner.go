@@ -2,25 +2,72 @@ package main
 
 import (
     "regexp"
+    "fmt"
 )
 
 type Token int 
 
 const (
-    EOF Token = -iota
+    EOF Token = iota
     ILLEGAL
     IDENT
     STRING
     INT
     OBJ
     FLOAT
+    LBRACE
+    RBRACE
     LPAREN
     RPAREN
     LBRACK
     RBRACK
+    COLON
+    SEMICOLON
+    COMMA
+    PERIOD
+    ADD
+    SUB
+    MUL
+    DIV
+    MOD
+    ASSIGN
+    EQ
+    NE
+    LT
+    GT
+    LE
+    GE
+    NOT
+    AND
+    OR
+    IN
+    RANGE
     OPERATOR
     KEYWORD
 )
+
+var tokens = map[Token]string {
+    EOF: "EOF",
+    ILLEGAL: "ILLEGAL",
+    IDENT: "IDENT",
+    INT: "INT",
+    STRING: "STRING",
+    MUL: "MUL",
+    DIV: "DIV",
+    MOD: "MOD",
+    LPAREN: "LPAREN",
+    RPAREN: "RPAREN",
+    LBRACK: "LBRACK",
+    RBRACK: "RBRACK",
+    RANGE: "RANGE",
+}
+
+func (t Token) String() string {
+    if s, ok := tokens[t]; ok {
+        return s
+    }
+    return fmt.Sprintf("%v", int(t))        
+}
 
 var keyword = map[string]bool {
     "for": true,
@@ -32,18 +79,37 @@ var keyword = map[string]bool {
     "return": true,
 }
 
-var operator = map[string]bool {
-    "+": true,
-    "-": true,
-    "*": true,
-    "/": true,
-    "%": true,
-    "..": true,
-    "==": true,
-    "=": true,
-    "<": true,
-    ">": true,
-    // etc...
+var operator = map[string]Token {
+    "+": ADD,
+    "-": SUB,
+    "*": MUL,
+    "/": DIV,
+    "%": MOD,
+    "..": RANGE,
+    "==": EQ,
+    "=": ASSIGN,
+    "<": LT,
+    ">": GT,
+    "<=": LE,
+    ">=": GE,
+    "!=": NE,
+    "!": NOT,
+    "&&": AND,
+    "||": OR,
+    "in": IN,
+}
+
+var symbol = map[string]Token {
+    "{": LBRACE,
+    "}": RBRACE,
+    "[": LBRACK,
+    "]": RBRACK,
+    "(": LPAREN,
+    ")": RPAREN,
+    ":": COLON,
+    ";": SEMICOLON,
+    ".": PERIOD,
+    ",": COMMA,
 }
 
 type Scanner struct {
@@ -68,7 +134,8 @@ var reFloat = regexp.MustCompile(`^[0-9]+\.[0-9]+`)
 var reStr = regexp.MustCompile(`^".*"`)
 var reObj = regexp.MustCompile(`^#[0-9\-]+`)
 var reIdent = regexp.MustCompile(`^[a-zA-Z_]+[a-zA-Z0-9_]*`)
-var reOp = regexp.MustCompile(`^[\$\^\.\|\?\*\+!%<>=]`)
+var reOp = regexp.MustCompile(`^[\^\.\|\?\*\+!%<>=&]+`)
+var reSym = regexp.MustCompile(`^[\{\[\(\}\]\)\$\.@,;:]`)
 var reWs = regexp.MustCompile(`^[\n\t\r ]+`)
 
 func (s *Scanner) scanRegexp(re *regexp.Regexp) (ok bool) {
@@ -97,10 +164,6 @@ func (s *Scanner) scanObj() (ok bool) {
     return s.scanRegexp(reObj)
 }
 
-func (s *Scanner) scanOp() (ok bool) {
-    return s.scanRegexp(reOp)
-}
-
 func (s *Scanner) scanWs() (ok bool) {
     return s.scanRegexp(reWs)
 }
@@ -125,12 +188,20 @@ func (s *Scanner) scanKeyword() (ok bool) {
     return
 }
 
+func (s *Scanner) scanOp() (tok Token) {
+    tok = ILLEGAL
+    if ok := s.scanRegexp(reOp); ok {
+        if tok, ok = operator[s.tt]; !ok {
+            tok = ILLEGAL
+            s.pos -= len(s.tt)
+        }
+    }
+    return
+}
+
 func (s *Scanner) scanLit() (tok Token) {
     tok = ILLEGAL
     switch {
-    case s.scanOp():
-        tok = OPERATOR
-        break
     case s.scanStr():
         tok = STRING
         break
@@ -150,6 +221,17 @@ func (s *Scanner) scanLit() (tok Token) {
     return
 }
 
+func (s *Scanner) scanSym() (tok Token) {
+    tok = ILLEGAL
+    if ok := s.scanRegexp(reSym); ok {
+        if tok, ok = symbol[s.tt]; ok {
+            return tok
+        }
+        s.pos -= len(s.tt)
+    }
+    return
+}
+
 func (s *Scanner) Next() int {
     if s.pos < len(s.b) {
         r := s.b[s.pos]
@@ -160,9 +242,17 @@ func (s *Scanner) Next() int {
 }
 
 func (s *Scanner) Scan() (tok Token) {
-    tok = s.scanLit()
-    // We just bluntly run by any 
-    // whitespace we encounter
     s.scanWs()
+    if s.pos >= len(s.b) {
+        return EOF
+    }
+    tok = ILLEGAL
+    if tok = s.scanLit(); tok != ILLEGAL {
+        return
+    }
+    if tok = s.scanOp(); tok != ILLEGAL {
+        return
+    }
+    tok = s.scanSym()
     return
 }
