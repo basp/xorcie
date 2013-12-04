@@ -11,7 +11,7 @@ const (
     EOF Token = iota
     ILLEGAL
     IDENT
-    STRING
+    STR
     INT
     OBJ
     FLOAT
@@ -51,42 +51,48 @@ var tokens = map[Token]string {
     ILLEGAL: "ILLEGAL",
     IDENT: "IDENT",
     INT: "INT",
-    STRING: "STRING",
+    STR: "STR",
     FLOAT: "FLOAT",
+    OBJ: "OBJ",
     ADD: "ADD",
     SUB: "SUB",
     MUL: "MUL",
     DIV: "DIV",
     MOD: "MOD",
+    ASSIGN: "ASSIGN",
     LPAREN: "LPAREN",
     RPAREN: "RPAREN",
     LBRACK: "LBRACK",
     RBRACK: "RBRACK",
+    LBRACE: "LBRACE",
+    RBRACE: "RBRACE",
     RANGE: "RANGE",
     COLON: "COLON",
     SEMICOLON: "SEMICOLON",
-    PERIOD: ".",
-    COMMA: ",",
+    PERIOD: "PERIOD",
+    COMMA: "COMMA",
 }
 
 const (
     LowestPrec = 0
-    UnaryPrec = 6
-    HighestPrec = 7
+    UnaryPrec = 7
+    HighestPrec = 8
 )
 
 func (t Token) Precedence() int {
     switch t {
-    case OR:
+    case ASSIGN:
         return 1
-    case AND:
+    case OR:
         return 2
-    case EQ, NE, LT, LE, GT, GE:
+    case AND:
         return 3
-    case ADD, SUB:
+    case EQ, NE, LT, LE, GT, GE:
         return 4
-    case MUL, DIV, MOD:
+    case ADD, SUB:
         return 5
+    case MUL, DIV, MOD:
+        return 6
     }
     return LowestPrec
 }
@@ -173,7 +179,6 @@ func (s *Scanner) scanRegexp(re *regexp.Regexp) (ok bool) {
     if loc := re.FindIndex(t); len(loc) == 2 {
         ok = true
         s.tt = string(t[loc[0]:loc[1]])
-        // s.pos += len(s.tt)
     }
     return
 }
@@ -201,9 +206,6 @@ func (s *Scanner) scanWs() (ok bool) {
 func (s *Scanner) scanIdent() (ok bool) {
     if ok = s.scanRegexp(reIdent); ok {
         ok = !keyword[s.tt]
-        //if !ok {
-            // s.pos -= len(s.tt)
-        //}
     }
     return
 }
@@ -211,9 +213,6 @@ func (s *Scanner) scanIdent() (ok bool) {
 func (s *Scanner) scanKeyword() (ok bool) {
     if ok = s.scanIdent(); !ok {
         s.advance = keyword[s.tt]
-        if ok {
-            // s.pos += len(s.tt)
-        }
     }
     return
 }
@@ -235,7 +234,7 @@ func (s *Scanner) scanLit() (tok Token) {
     switch {
     case s.scanStr():
         s.advance = true
-        tok = STRING
+        tok = STR
         break
     case s.scanIdent():
         s.advance = true
@@ -261,10 +260,6 @@ func (s *Scanner) scanSym() (tok Token) {
     tok = ILLEGAL
     if ok := s.scanRegexp(reSym); ok {
         tok, s.advance = symbol[s.tt]
-        //if tok, ok = symbol[s.tt]; ok {
-          //  return tok
-        //}
-        // s.pos -= len(s.tt)
     }
     return
 }
