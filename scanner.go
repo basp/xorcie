@@ -42,6 +42,8 @@ const (
     OR
     IN
     RANGE
+    EXPLEN
+    SPLAT
     OPERATOR
     KEYWORD
 )
@@ -293,7 +295,9 @@ func (s *Scanner) tryAdvance() (tok Token) {
 }
 
 func (s *Scanner) Scan() (tok Token) {
-    tok = s.tryAdvance()
+    if tok = s.tryAdvance(); tok == EOF {
+        return
+    }
     if tok = s.scanLit(); tok != ILLEGAL {
         return
     }

@@ -10,6 +10,7 @@ func parse(s string) Expr {
 }
 
 func main() {
-    expr := parse("foo:quux(x,y,{1,2,3}) = bar.(baz + 123) * 12.5)")
+    expr := parse("v = {foo:bar(quux) * 5, #123}")
+    // expr := parse("foo = {foo:quux()}")
     log.Printf("%v", expr)
 }

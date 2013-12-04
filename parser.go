@@ -56,6 +56,21 @@ type (
         Verb Expr 
         Args []Expr
     }
+
+    IndexExpr struct {
+        X Expr
+        Lbrack int
+        Index Expr
+        Rbrack int
+    }
+
+    SliceExpr struct {
+        X Expr
+        Lbrack int
+        Low Expr
+        High Expr
+        Rbrack int
+    }
 )
 
 func (x *Ident) String() string {
@@ -184,7 +199,9 @@ func (p *Parser) parsePropExpr(lhs bool, obj Expr) Expr {
     pos := p.expect(PERIOD)
     var prop Expr
     if p.tok == LPAREN {
+        p.next()
         prop = p.parseExpr(lhs)
+        p.expect(RPAREN)
     } else {
         prop = p.parseIdent()
     }
@@ -198,7 +215,9 @@ func (p *Parser) parseVerbExpr(lhs bool, obj Expr) Expr {
     pos := p.expect(COLON)
     var y Expr
     if p.tok == LPAREN {
+        p.next()
         y = p.parseExpr(lhs)
+        p.expect(RPAREN)
     } else {
         y = p.parseIdent()        
     }
@@ -207,12 +226,28 @@ func (p *Parser) parseVerbExpr(lhs bool, obj Expr) Expr {
     return &VerbExpr{pos, obj, y, args}
 }
 
+func (p *Parser) parseIndexOrSlice(lhs bool, x Expr) Expr {
+    if p.trace {
+        defer un(trace(p, "IndexOrSlice"))
+    }
+    lbrack := p.expect(LBRACK)
+    p.exprLev++
+    var index [2]Expr
+    index[0] = p.parseRhs()
+    if p.tok == RANGE {
+        p.next()
+    } else {
+        
+    }
+    index[1] = p.parseRhs()
+
+}
+
 func (p *Parser) parsePrimaryExpr(lhs bool) Expr {
     if p.trace {
         defer un(trace(p, "PrimaryExpr"))
     }
     x := p.parseOperand(lhs)
-    trace(p, p.tok.String())
 L:
     for {
         switch p.tok {
@@ -220,6 +255,9 @@ L:
             x = p.parsePropExpr(lhs, x)
         case COLON:
             x = p.parseVerbExpr(lhs, x)
+            p.expect(RPAREN)
+        case LBRACK:
+            x = p.parseIndexOrSlice(lhs, x)
         default:
             break L
         }
