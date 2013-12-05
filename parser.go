@@ -105,6 +105,14 @@ func (x *VerbExpr) String() string {
     return fmt.Sprintf("VerbExpr(%v %v %v)", x.Obj, x.Verb, x.Args)
 }
 
+func (x *IndexExpr) String() string {
+    return fmt.Sprintf("IndexExpr(%v %v)", x.X, x.Index)
+}
+
+func (x *SliceExpr) String() string {
+    return fmt.Sprintf("SliceExpr(%v %v %v)", x.X, x.Low, x.High)
+}
+
 type Parser struct {
     scanner *Scanner
     lit string
@@ -236,11 +244,14 @@ func (p *Parser) parseIndexOrSlice(lhs bool, x Expr) Expr {
     index[0] = p.parseRhs()
     if p.tok == RANGE {
         p.next()
-    } else {
-        
+        index[1] = p.parseRhs()
     }
-    index[1] = p.parseRhs()
-
+    rbrack := p.expect(RBRACK)
+    if index[1] != nil {
+        return &SliceExpr{x, lbrack, index[0], index[1], rbrack}
+    } else {
+        return &IndexExpr{x, lbrack, index[0], rbrack}
+    }
 }
 
 func (p *Parser) parsePrimaryExpr(lhs bool) Expr {
@@ -310,8 +321,6 @@ func (p *Parser) parseBinaryExpr(lhs bool, prec1 int) Expr {
         defer un(trace(p, "BinaryExpr"))
     }
     x := p.parseUnaryExpr(lhs)
-    _, tmp := p.tokPrec()
-    trace(p, fmt.Sprintf("%v %v", p.tok.String(), tmp))
     for _, prec := p.tokPrec(); prec >= prec1; prec-- {
         for {
             op, oprec := p.tokPrec()

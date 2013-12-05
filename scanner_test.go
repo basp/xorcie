@@ -33,7 +33,7 @@ type simpleScanCase struct {
 var simpleScanCases = []simpleScanCase {
     simpleScanCase{"foo", IDENT},
     simpleScanCase{"123.45", FLOAT},
-    simpleScanCase{`"foo"`, STRING},
+    simpleScanCase{`"foo"`, STR},
     simpleScanCase{"123", INT},
     simpleScanCase{"#123", OBJ},
 }
