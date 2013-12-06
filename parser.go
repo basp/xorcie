@@ -71,6 +71,36 @@ type (
         High Expr
         Rbrack int
     }
+
+    AssignStmt struct {
+        Lhs Expr
+        TokPos int
+        Tok Token
+        Rhs Expr
+    }
+
+    Stmt interface {        
+    }
+
+    ExprStmt struct {
+        X Expr
+    }    
+
+    EmptyStmt struct {
+        Semicolon int
+    }
+
+    IfStmt struct {
+        If int
+        Cond Expr
+        List []Stmt
+        Else Stmt
+    }
+
+    ReturnStmt struct {
+        Return int
+        Result Expr
+    }
 )
 
 func (x *Ident) String() string {
@@ -111,6 +141,18 @@ func (x *IndexExpr) String() string {
 
 func (x *SliceExpr) String() string {
     return fmt.Sprintf("SliceExpr(%v %v %v)", x.X, x.Low, x.High)
+}
+
+func (x *EmptyStmt) String() string {
+    return fmt.Sprintf("EmptyStmt()")
+}
+
+func (x *ExprStmt) String() string {
+    return fmt.Sprintf("ExprStmt(%v)", x.X)
+}
+
+func (x *ReturnStmt) String() string {
+    return fmt.Sprintf("ReturnStmt(%v)", x.Result)
 }
 
 type Parser struct {
@@ -186,6 +228,58 @@ func (p *Parser) expect(tok Token) int {
 
 func (p *Parser) errorExpected(s string) {
     panic("expected " + s)
+}
+
+func (p *Parser) parseSimpleStmt() Stmt {
+    if p.trace {
+        defer un(trace(p, "SimpleStmt"))
+    }
+    if p.tok == SEMICOLON {
+        return &EmptyStmt{Semicolon: p.pos}
+    }
+    x := p.parseExpr(false)
+    p.expect(SEMICOLON)
+    return &ExprStmt{X: x}
+}
+
+func (p *Parser) parseReturnStmt() Stmt {
+    if p.trace {
+        defer un(trace(p, "ReturnStmt"))
+    }
+    pos := p.pos
+    p.expect(RETURN)
+    x := p.parseExpr(false)
+    p.expect(SEMICOLON)
+    return &ReturnStmt{Return: pos, Result: x}
+}
+
+func (p *Parser) parseForStmt() Stmt {
+    return nil
+}
+
+func (p *Parser) parseStmtList() (list []Stmt) {
+    if p.trace {
+        defer un(trace(p, "StatementList"))
+    }
+    for p.tok != ENDIF && p.tok != ENDFOR && p.tok != EOF {
+        list = append(list, p.parseStmt())
+    }
+    return
+}
+
+func (p *Parser) parseStmt() (s Stmt) {
+    if p.trace {
+        defer un(trace(p, "Statement"))
+    }
+    switch p.tok {
+    case IDENT, INT, FLOAT, STR, LPAREN, LBRACE, ADD, SUB, NOT:
+        s = p.parseSimpleStmt()
+    case RETURN:
+        s = p.parseReturnStmt()
+    case FOR:
+        s = p.parseForStmt()
+    }
+    return
 }
 
 func (p *Parser) parseIdent() *Ident {

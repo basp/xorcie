@@ -40,11 +40,19 @@ const (
     NOT
     AND
     OR
-    IN
+    OPIN
     RANGE
     EXPLEN
     SPLAT
     OPERATOR
+    IF
+    ELSE
+    ELSEIF
+    ENDIF
+    FOR
+    IN
+    ENDFOR
+    RETURN
     KEYWORD
 )
 
@@ -73,6 +81,7 @@ var tokens = map[Token]string {
     SEMICOLON: "SEMICOLON",
     PERIOD: "PERIOD",
     COMMA: "COMMA",
+    RETURN: "RETURN",
 }
 
 const (
@@ -133,7 +142,7 @@ var operator = map[string]Token {
     "!": NOT,
     "&&": AND,
     "||": OR,
-    "in": IN,
+    "in": OPIN,
 }
 
 var symbol = map[string]Token {
@@ -212,10 +221,28 @@ func (s *Scanner) scanIdent() (ok bool) {
     return
 }
 
-func (s *Scanner) scanKeyword() (ok bool) {
-    if ok = s.scanIdent(); !ok {
-        s.advance = keyword[s.tt]
+func (s *Scanner) scanKeyword() (tok Token) {
+    tok = ILLEGAL
+    s.advance = true
+    if !s.scanIdent() {
+        switch s.tt {
+        case "for":
+            return FOR
+        case "endfor":
+            return ENDFOR
+        case "if":
+            return IF
+        case "else":
+            return ELSE
+        case "elseif":
+            return ELSEIF
+        case "endif":
+            return ENDIF
+        case "return":
+            return RETURN
+        }
     }
+    s.advance = false
     return
 }
 
@@ -304,8 +331,7 @@ func (s *Scanner) Scan() (tok Token) {
     if tok = s.scanOp(); tok != ILLEGAL {
         return
     }
-    if s.scanKeyword() {
-        tok = KEYWORD
+    if tok = s.scanKeyword(); tok != ILLEGAL {
         return
     }
     tok = s.scanSym()
