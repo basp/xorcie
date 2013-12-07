@@ -57,6 +57,13 @@ type (
         Args []Expr
     }
 
+    RangeExpr struct {
+        Lbrack int
+        Low Expr
+        High Expr
+        Rbrack int
+    }
+
     IndexExpr struct {
         X Expr
         Lbrack int
@@ -101,6 +108,15 @@ type (
         Return int
         Result Expr
     }
+
+    ForRangeStmt struct {
+        For int
+        Var *Ident
+        In int
+        Range Expr
+        List []Stmt
+        EndFor int
+    }
 )
 
 func (x *Ident) String() string {
@@ -135,6 +151,10 @@ func (x *VerbExpr) String() string {
     return fmt.Sprintf("VerbExpr(%v %v %v)", x.Obj, x.Verb, x.Args)
 }
 
+func (x *RangeExpr) String() string {
+    return fmt.Sprintf("Range(%v %v)", x.Low, x.High)
+}
+
 func (x *IndexExpr) String() string {
     return fmt.Sprintf("IndexExpr(%v %v)", x.X, x.Index)
 }
@@ -155,6 +175,14 @@ func (x *ReturnStmt) String() string {
     return fmt.Sprintf("ReturnStmt(%v)", x.Result)
 }
 
+func (x *IfStmt) String() string {
+    return fmt.Sprintf("IfStmt(%v %v %v)", x.Cond, x.List, x.Else)    
+}
+
+func (x *ForRangeStmt) String() string {
+    return fmt.Sprintf("ForRange(%v %v %v)", x.Var, x.Range, x.List) 
+}
+
 type Parser struct {
     scanner *Scanner
     lit string
@@ -173,7 +201,7 @@ func NewParser(b []byte) *Parser {
         pos: 0,
         tok: s.Scan(),
         lit: s.tt,
-        trace: true,
+        trace: false,
     }
     return p
 }
@@ -253,15 +281,55 @@ func (p *Parser) parseReturnStmt() Stmt {
     return &ReturnStmt{Return: pos, Result: x}
 }
 
-func (p *Parser) parseForStmt() Stmt {
+func (p *Parser) parseIfStmt() Stmt {
+    if p.trace {
+        defer un(trace(p, "IfStmt"))
+    }
+    if p.tok == IF || p.tok == ELSEIF {
+        var _if int
+        if p.tok == IF || p.tok == ELSEIF {
+            _if = p.expect(p.tok)
+        }
+        c := p.parseExpr(true)
+        l := p.parseStmtList()
+        if p.tok == ENDIF {
+            return &IfStmt{_if, c, l, nil}
+        }
+        var _else Stmt
+        if p.tok == ELSE {
+            p.expect(ELSE)
+            _else = p.parseStmtList()
+        }
+        if p.tok == ELSEIF {
+            _else = p.parseIfStmt()
+        }
+        return &IfStmt{_if, c, l, _else}
+    }
     return nil
+}
+
+func (p *Parser) parseForRangeStmt() Stmt {
+    if p.trace {
+        defer un(trace(p, "ForRange"))
+    }   
+    _for := p.expect(FOR)
+    id := p.parseIdent()
+    in := p.expect(IN)
+    r := p.parseRange()        
+    body := p.parseStmtList()
+    endfor := p.expect(ENDFOR)
+    return &ForRangeStmt{_for, id, in, r, body, endfor}
 }
 
 func (p *Parser) parseStmtList() (list []Stmt) {
     if p.trace {
         defer un(trace(p, "StatementList"))
     }
-    for p.tok != ENDIF && p.tok != ENDFOR && p.tok != EOF {
+    for {
+        switch p.tok {
+        case ENDIF, ENDFOR, ELSE, ELSEIF, EOF:
+            return
+        }
         list = append(list, p.parseStmt())
     }
     return
@@ -277,12 +345,17 @@ func (p *Parser) parseStmt() (s Stmt) {
     case RETURN:
         s = p.parseReturnStmt()
     case FOR:
-        s = p.parseForStmt()
+        s = p.parseForRangeStmt()
+    case IF:
+        s = p.parseIfStmt()
     }
     return
 }
 
 func (p *Parser) parseIdent() *Ident {
+    if p.trace {
+        defer un(trace(p, "Ident"))
+    }
     pos := p.pos
     name := "_"
     if p.tok == IDENT {
@@ -348,6 +421,19 @@ func (p *Parser) parseIndexOrSlice(lhs bool, x Expr) Expr {
     }
 }
 
+func (p *Parser) parseRange() Expr {
+    if p.trace {
+        defer un(trace(p, "Range"))
+    }
+    lbrack := p.expect(LBRACK)
+    var index [2]Expr
+    index[0] = p.parseRhs()
+    p.expect(RANGE)
+    index[1] = p.parseRhs()
+    rbrack := p.expect(RBRACK)
+    return &RangeExpr{lbrack, index[0], index[1], rbrack}
+}
+
 func (p *Parser) parsePrimaryExpr(lhs bool) Expr {
     if p.trace {
         defer un(trace(p, "PrimaryExpr"))
@@ -362,7 +448,11 @@ L:
             x = p.parseVerbExpr(lhs, x)
             p.expect(RPAREN)
         case LBRACK:
-            x = p.parseIndexOrSlice(lhs, x)
+            if x != nil {
+                x = p.parseIndexOrSlice(lhs, x)                
+            } else {
+                x = p.parseRange()
+            }
         default:
             break L
         }

@@ -69,6 +69,11 @@ var tokens = map[Token]string {
     MUL: "MUL",
     DIV: "DIV",
     MOD: "MOD",
+    EQ: "EQ",
+    LT: "LT",
+    GT: "GT",
+    LE: "LE",
+    GE: "GE",
     ASSIGN: "ASSIGN",
     LPAREN: "LPAREN",
     RPAREN: "RPAREN",
@@ -82,6 +87,13 @@ var tokens = map[Token]string {
     PERIOD: "PERIOD",
     COMMA: "COMMA",
     RETURN: "RETURN",
+    IN: "IN",
+    IF: "IF",
+    ELSEIF: "ELSEIF",
+    ELSE: "ELSE",
+    ENDIF: "ENDIF",
+    FOR: "FOR",
+    ENDFOR: "ENDFOR",
 }
 
 const (
@@ -121,6 +133,7 @@ var keyword = map[string]bool {
     "in": true,
     "if": true,
     "else": true,
+    "elseif": true,
     "endif": true,
     "return": true,
 }
@@ -238,6 +251,8 @@ func (s *Scanner) scanKeyword() (tok Token) {
             return ELSEIF
         case "endif":
             return ENDIF
+        case "in":
+            return IN
         case "return":
             return RETURN
         }
@@ -325,13 +340,13 @@ func (s *Scanner) Scan() (tok Token) {
     if tok = s.tryAdvance(); tok == EOF {
         return
     }
+    if tok = s.scanKeyword(); tok != ILLEGAL {
+        return
+    }
     if tok = s.scanLit(); tok != ILLEGAL {
         return
     }
     if tok = s.scanOp(); tok != ILLEGAL {
-        return
-    }
-    if tok = s.scanKeyword(); tok != ILLEGAL {
         return
     }
     tok = s.scanSym()
